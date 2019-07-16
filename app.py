@@ -1,14 +1,13 @@
 # coding: utf-8
 from flask import Flask, jsonify, request
 import os
-from sheetocr import shtocr, singleocr, ptrans
+from ocrutils import ptrans
 import numpy as np
 import uuid
 import json
+from core import SheetRecognizer
 
 app = Flask(__name__)
-path = r'D:\pic'
-# sess, x, y, keep = netutil.getnet(r'D:\pic\net2')
 
 
 #
@@ -19,29 +18,13 @@ def test():
 
 
 #
-@app.route('/testsingle')
-def testsingle():
-    n = 2
-    s, num = singleocr(n, sess, x, y, keep, os.path.join(path, 'simple.jpg'))
-    print(s, num)
-    return ""
-
-
-#
 @app.route('/testsheet')
 def testsheet():
+    path = r'D:\pic'
     name = 'cut2.jpg'
-    r = shtocr(sess, x, y, keep, os.path.join(path, name), rows=14, cols=12, stroke=12, save=True)
-    np.savetxt(os.path.join(path, name + '-result.csv'), r, delimiter=',', fmt='%s')
-    return ""
-
-
-@app.route('/testpt')
-def testpt():
-    name = 'pers.jpg'
-    newname = 'pers-after.jpg'
-    pts = np.float32([[101, 141], [516, 97], [467, 456], [125, 474]])
-    ptrans(os.path.join(path, name), os.path.join(path, newname), pts)
+    r = SheetRecognizer(formats=3)
+    result = r.ocr(os.path.join(path, name), rows=14, cols=12, stroke=12)
+    np.savetxt(os.path.join(path, name + '-result.csv'), result, delimiter=',', fmt='%s')
     return ""
 
 

@@ -1,22 +1,99 @@
 import numpy as np
 from PIL import Image
 from ocrutils import netoutput
+import config
+import os
+import ocrutils
 
 
 class SheetRecognizer:
-    def __init__(self, formats):
+    def __init__(self, formats, dosave=False, splpath=None, respath=None):
+        self.recognizer = CellRecognizer(3)
         self.formats = formats
+        self.dosave = dosave
+        self.splitpath = None
+        self.resultpath = None
+        if dosave:
+            if not splpath:
+                self.splitpath = config.SPLIT_PATH
+            if not respath:
+                self.resultpath = config.RESULT_PATH
 
-    def ocr(self, path):
-        pass
+    def ocr(self, path, rows, cols, splitn=None, stroke=10):
+        im = Image.open(path)
+        w, h = im.size
+        wcell = w / cols
+        hcell = h / rows
+
+        # do wipe border and save for check
+        im = self.wipeborder(im, wcell, hcell, w, h)
+        if self.dosave:
+            im.save(os.path.join(self.resultpath, 'wipe.jpg'))
+
+        results = []
+        # cutborder = 8
+        cutborder = stroke
+        if splitn is None:
+            splitn = self.formats
+        if isinstance(splitn, int):
+            splitn = np.ones(rows) * splitn
+
+        for i in range(rows):
+            for j in range(cols):
+                newimg = im.crop((
+                    j * wcell + cutborder,
+                    i * hcell,
+                    (j + 1) * wcell - cutborder,
+                    (i + 1) * hcell))
+                if self.dosave:
+                    newimg.save(os.path.join(self.splitpath, '%(i)d-%(j)d.jpg' % {'i': i, 'j': j}))
+                # cur_result = resultstr(cellocr(newimg, splitn[i], sess, x, y, keep))
+                cur_result = ocrutils.resultstr(self.recognizer.ocr(newimg, formatter=splitn[i]))
+                # if not cur_result.any():
+                #     continue
+                if self.dosave:
+                    newimg.save(os.path.join(self.resultpath, '%(i)d-%(j)d-(%(s)s).jpg'
+                                             % {'s': cur_result, 'i': i, 'j': j}))
+                results.append(cur_result)
+                # print(i, j, cur_result)
+
+        return np.array(results).reshape((rows, cols))
+
+    # 擦除横纵表线
+    @staticmethod
+    def wipeborder(im, wcell, hcell, w, h):
+        imarray = np.array(im)
+        hlinewin = int(wcell * 1.2)
+        vlinewin = int(hcell * 1.2)
+        winrange = 1
+        wipetol = 120
+
+        for i in range(0, h - winrange):
+            for j in range(0, w - hlinewin):
+                for m in range(winrange):
+                    if np.mean(imarray[i + m, j:j + hlinewin]) < wipetol:
+                        imarray[i + m, j:j + hlinewin] = 255
+
+        for i in range(0, h - vlinewin):
+            for j in range(0, w - winrange):
+                for m in range(winrange):
+                    if np.mean(imarray[i:i + vlinewin, j + m]) < wipetol:
+                        imarray[i:i + vlinewin, j + m] = 255
+
+        im = Image.fromarray(imarray)
+        return im
 
 
 class CellRecognizer:
-    def __init__(self, fmt):
-        self.fmt = fmt
+    def __init__(self, defaultfmt):
+        # fixed format
+        self.fmt = defaultfmt
 
-    def ocr(self, im):
-        ims = self.fig2images(im, self.fmt)
+    def ocr(self, im, formatter=None):
+        if not formatter:
+            ims = self.fig2images(im, self.fmt)
+        else:
+            ims = self.fig2images(im, formatter)
         if not ims.any():
             return np.array([])
         return netoutput(ims, keep=0.6)
@@ -100,8 +177,12 @@ class CellRecognizer:
             curimg = im.crop((splits[i], 0, splits[i + 1], hnum))
             curimg.thumbnail((100, regsize))
             arrayed = np.array(curimg)  # [:, :, 0]
-            factor = 255 / np.max(arrayed)
-            arrayed = 255 - arrayed * factor
+            if arrayed.shape[2] > 1:
+                arrayed = arrayed[:, :, 0]
+
+            if np.max(arrayed) > 0:
+                factor = 255 / np.max(arrayed)
+                arrayed = 255 - arrayed * factor
 
             # 去除像素量小于minconn_eliminate的连通分量
             minconn_eliminate = 50
@@ -149,13 +230,17 @@ class CellRecognizer:
             sumxw = 0
             sumyw = 0
             sumw = 0
-            for i in range(regsize):
-                for j in range(curw):
-                    sumxw += j * arrayed[i][j]
-                    sumyw += i * arrayed[i][j]
-                    sumw += arrayed[i][j]
-            xcenter = sumxw / sumw
-            ycenter = sumyw / sumw
+            for iii in range(regsize):
+                for jjj in range(curw):
+                    sumxw += jjj * arrayed[iii][jjj]
+                    sumyw += iii * arrayed[iii][jjj]
+                    sumw += arrayed[iii][jjj]
+            if sumw == 0:
+                xcenter = 0
+                ycenter = 0
+            else:
+                xcenter = sumxw / sumw
+                ycenter = sumyw / sumw
             # print(xcenter, ycenter)
             # leftpadding = int((regsize - curw) / 2)
             # rightpadding = regsize - curw - leftpadding

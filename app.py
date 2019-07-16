@@ -23,7 +23,7 @@ def testsheet():
     path = r'D:\pic'
     name = 'cut2.jpg'
     r = SheetRecognizer(formats=3)
-    result = r.ocr(os.path.join(path, name), rows=14, cols=12, stroke=12)
+    result = r.ocr(os.path.join(path, name), rows=14, cols=12, stroke=0)
     np.savetxt(os.path.join(path, name + '-result.csv'), result, delimiter=',', fmt='%s')
     return ""
 

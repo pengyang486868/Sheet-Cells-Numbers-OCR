@@ -175,7 +175,10 @@ class CellRecognizer:
             # if splits[i + 1] - splits[i] < hnum / 10:
             #     continue
             curimg = im.crop((splits[i], 0, splits[i + 1], hnum))
-            curimg.thumbnail((100, regsize))
+            # curimg.thumbnail((100, regsize))
+            curimg = curimg.resize(
+                (int(curimg.size[0] * regsize / curimg.size[1]), regsize),
+                resample=Image.ANTIALIAS)
             arrayed = np.array(curimg)  # [:, :, 0]
             if arrayed.shape[2] > 1:
                 arrayed = arrayed[:, :, 0]

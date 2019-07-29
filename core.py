@@ -1,6 +1,5 @@
 import numpy as np
 from PIL import Image
-from ocrutils import netoutput
 import config
 import os
 import ocrutils
@@ -8,7 +7,7 @@ import ocrutils
 
 class SheetRecognizer:
     def __init__(self, formats, dosave=False, splpath=None, respath=None):
-        self.recognizer = CellRecognizer(3)
+        self.recognizer = CellRecognizer(defaultfmt=3)
         self.formats = formats
         self.dosave = dosave
         self.splitpath = None
@@ -96,17 +95,19 @@ class CellRecognizer:
             ims = self.fig2images(im, formatter)
         if not ims.any():
             return np.array([])
-        return netoutput(ims, keep=0.6)
+        return ocrutils.netoutput(ims, keep=0.6)
 
     # 单元格按n格式切成标准的28*28子图
     @staticmethod
     def fig2images(im, n):
         tol = 0.9
 
-        # im = Image.open(path)
-        imraw = np.array(im)  # [:, :, 0]
-        imsolid = np.where(imraw >= 128, 1, 0)
+        # should decide whether grey image or color image
+        imraw = np.array(im)
+        if imraw.ndim > 2:
+            imraw = imraw[:, :, 0]
 
+        imsolid = np.where(imraw >= 128, 1, 0)
         hnum = imsolid.shape[0]
         vnum = imsolid.shape[1]
         vvec = np.mean(imsolid, axis=0)
@@ -172,15 +173,15 @@ class CellRecognizer:
         regsize = 28
 
         for i in range(len(splits) - 1):
-            # if splits[i + 1] - splits[i] < hnum / 10:
-            #     continue
+            if splits[i + 1] - splits[i] < hnum / 10:
+                continue
             curimg = im.crop((splits[i], 0, splits[i + 1], hnum))
-            # curimg.thumbnail((100, regsize))
+            # print(splits)
             curimg = curimg.resize(
                 (int(curimg.size[0] * regsize / curimg.size[1]), regsize),
                 resample=Image.ANTIALIAS)
             arrayed = np.array(curimg)  # [:, :, 0]
-            if arrayed.shape[2] > 1:
+            if arrayed.ndim > 2:
                 arrayed = arrayed[:, :, 0]
 
             if np.max(arrayed) > 0:

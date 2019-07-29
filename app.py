@@ -6,6 +6,7 @@ import numpy as np
 import uuid
 import json
 from core import SheetRecognizer
+import config
 
 app = Flask(__name__)
 
@@ -36,7 +37,7 @@ def ocr():
     if request.method == 'POST':
         data = request.get_data()
         httpargs = json.loads(data.decode())
-        splitnarr = httpargs['snumber']
+        splitnarr = np.array(httpargs['snumber'], dtype=float)
 
     if request.method == 'GET':
         httpargs = request.args
@@ -50,13 +51,15 @@ def ocr():
     givencols = int(httpargs['cols'])
     givenstroke = int(httpargs['stroke'])
 
-    newpath = os.path.join(path, 'temp', 'temp' + str(uuid.uuid1()) + '.jpg')
+    tempseepath = config.TEMP_SEE_PATH
+    newpath = os.path.join(tempseepath, 'temp' + str(uuid.uuid1()) + '.jpg')
     ptrans(opath, newpath, pts)
 
-    r = shtocr(sess, x, y, keep, newpath, splitn=splitnarr,
-               rows=givenrows, cols=givencols, stroke=givenstroke, save=True)
-    np.savetxt(opath + '-result.csv', r, delimiter=',', fmt='%s')
-    return ""
+    r = SheetRecognizer(formats=3, dosave=True)
+    result = r.ocr(newpath, splitn=splitnarr,
+                   rows=givenrows, cols=givencols, stroke=givenstroke)
+    np.savetxt(opath + '-result.csv', result, delimiter=',', fmt='%s')
+    return ''
 
 
 # 启动程序

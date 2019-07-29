@@ -1,3 +1,5 @@
-NET_ADDR = 'http://localhost:17088'
+# NET_ADDR = 'http://localhost:17088'
+NET_ADDR = 'http://localhost:4003'
 SPLIT_PATH = r'D:\pic\splits'
 RESULT_PATH = r'D:\pic\results'
+TEMP_SEE_PATH= r'D:\pic\temp'
